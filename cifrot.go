@@ -3,13 +3,17 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"unicode/utf8"
 )
 
 const alphsize = 27
+const es_index = 0.07464494
 
+var mindiff = math.Inf(1)
+var freqcount [27]float64
 var alph = []rune("ABCDEFGHIJKLMNÑOPQRSTUVWXYZ")
 var es_letterprob = []float64{
 	/* a    b     c     d     e     f     g     h     i */
@@ -29,7 +33,21 @@ func encrypt(key int, message string) string {
 }
 
 func decrypt(message string) string {
-	return "toimplement"
+	letterfreq(message)
+	probablekey := analyzefrequencies()
+	return dec(probablekey, message)
+}
+
+func letterfreq(m string) {
+	msgsize := 0.0
+	for _, r := range m {
+		i := letterindex(r, 0)
+		freqcount[i]++
+		msgsize++
+	}
+	for i := 0; i < alphsize; i++ {
+		freqcount[i] /= msgsize
+	}
 }
 
 func dec(key int, message string) string {
@@ -40,6 +58,22 @@ func dec(key int, message string) string {
 	return string(s)
 }
 
+func analyzefrequencies() int {
+	probablekey := 0
+	for k := 1; k < alphsize; k++ {
+		ic := 0.0 /* Index of coincidence */
+		for i := 0; i < alphsize; i++ {
+			ic += es_letterprob[i] * freqcount[(i+k)%alphsize]
+		}
+		diff := es_index - ic
+		if diff < mindiff {
+			mindiff = diff
+			probablekey = k
+		}
+	}
+	return probablekey
+}
+
 func validatekey(key int) {
 	if key >= alphsize {
 		fmt.Fprintln(os.Stderr, "error: llave %d inválida", key)
@@ -48,8 +82,12 @@ func validatekey(key int) {
 }
 
 func shiftforward(r rune, key int) rune {
+	return alph[letterindex(r, key)]
+}
+
+func letterindex(r rune, key int) int {
 	if r == 'Ñ' {
-		return alph[(14+key)%alphsize]
+		return (14 + key) % alphsize
 	}
 	if r >= 'o' && r <= 'z' || r >= 'O' && r <= 'Z' {
 		r = r - 'a' + 1 + rune(key)
@@ -59,7 +97,7 @@ func shiftforward(r rune, key int) rune {
 		fmt.Fprintln(os.Stderr, "error: rune %d inválido", r)
 		os.Exit(1)
 	}
-	return alph[r%alphsize]
+	return int(r) % alphsize
 }
 
 func die(a ...interface{}) {
@@ -72,7 +110,14 @@ func shiftbackward(r rune, key int) rune {
 }
 
 func usage() {
+	/* TODO print usage */
+	os.Exit(1)
+}
 
+func getinput() string {
+	bio := bufio.NewReader(os.Stdin)
+	s, _ := bio.ReadString('\n')
+	return s[:len(s)-1]
 }
 
 func main() {
@@ -104,10 +149,4 @@ func main() {
 	default:
 		usage()
 	}
-}
-
-func getinput() string {
-	bio := bufio.NewReader(os.Stdin)
-	s, _ := bio.ReadString('\n')
-	return s[:len(s)-1]
 }
