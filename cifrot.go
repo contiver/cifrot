@@ -26,8 +26,10 @@ var es_letterprob = []float64{
 
 func encrypt(key int, message string) string {
 	s := make([]rune, utf8.RuneCountInString(message))
-	for i, r := range message {
-		s[i] = shiftforward(r, key)
+	j := 0
+	for _, r := range message {
+		s[j] = shiftforward(r, key)
+		j++
 	}
 	return string(s)
 }
@@ -52,8 +54,10 @@ func letterfreq(m string) {
 
 func dec(key int, message string) string {
 	s := make([]rune, utf8.RuneCountInString(message))
-	for i, r := range message {
-		s[i] = shiftbackward(r, key)
+	j := 0
+	for _, r := range message {
+		s[j] = shiftbackward(r, key)
+		j++
 	}
 	return string(s)
 }
@@ -75,43 +79,46 @@ func analyzefrequencies() int {
 }
 
 func validatekey(key int) {
-	if key >= alphsize {
-		fmt.Fprintln(os.Stderr, "error: llave %d inválida", key)
-		os.Exit(1)
+	if key < 0 || key >= alphsize {
+		die("error: llave %d inválida\n", key)
 	}
 }
 
 func shiftforward(r rune, key int) rune {
-	return alph[letterindex(r, key)]
+	l := letterindex(r, key)
+	return alph[l]
 }
 
 func letterindex(r rune, key int) int {
-	if r == 'Ñ' {
+	if r == 'Ñ' || r == 'ñ' {
 		return (14 + key) % alphsize
 	}
-	if r >= 'o' && r <= 'z' || r >= 'O' && r <= 'Z' {
-		r = r - 'a' + 1 + rune(key)
-	} else if 'a' <= r && r <= 'n' || 'A' <= r && r <= 'N' {
+	if r >= 'a' && r <= 'n' {
 		r = r - 'a' + rune(key)
+	} else if r >= 'o' && r <= 'z' {
+		r = r - 'a' + 1 + rune(key)
+	} else if r >= 'O' && r <= 'Z' {
+		r = r - 'A' + 1 + rune(key)
+	} else if r >= 'A' && r <= 'N' {
+		r = r - 'A' + rune(key)
 	} else {
-		fmt.Fprintln(os.Stderr, "error: rune %d inválido", r)
-		os.Exit(1)
+		die("error: rune %d inválido\n", r)
 	}
 	return int(r) % alphsize
 }
 
-func die(a ...interface{}) {
-	fmt.Fprintln(os.Stderr, a)
+func die(format string, errstr ...interface{}) {
+	fmt.Fprintf(os.Stderr, format, errstr)
 	os.Exit(1)
 }
 
 func shiftbackward(r rune, key int) rune {
-	return shiftforward(r, alphsize-key)
+	aux := alphsize - key
+	return shiftforward(r, aux)
 }
 
 func usage() {
-	/* TODO print usage */
-	os.Exit(1)
+	die("usage: %s (cif n | dec [n])\n", os.Args[0])
 }
 
 func getinput() string {
@@ -136,16 +143,17 @@ func main() {
 			usage()
 		}
 		m := getinput()
-		encrypt(k, m)
-		fmt.Println(m)
+		ciphertext := encrypt(k, m)
+		fmt.Println(ciphertext)
 	case "dec":
 		m := getinput()
+		var plaintext string
 		if len(os.Args) < 3 {
-			dec(k, m)
+			plaintext = decrypt(m)
 		} else {
-			decrypt(m)
+			plaintext = dec(k, m)
 		}
-		fmt.Println(m)
+		fmt.Println(plaintext)
 	default:
 		usage()
 	}
